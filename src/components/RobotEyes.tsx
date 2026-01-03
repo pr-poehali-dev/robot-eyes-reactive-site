@@ -1,128 +1,130 @@
-import { useEffect, useRef, useState } from 'react';
-
-interface EyePosition {
-  x: number;
-  y: number;
-}
+import { useEffect, useState } from 'react';
 
 interface RobotEyesProps {
-  trackingMode: 'motion' | 'face' | 'expression' | 'idle';
+  intensity: number;
 }
 
-export const RobotEyes = ({ trackingMode }: RobotEyesProps) => {
-  const [leftEyePos, setLeftEyePos] = useState<EyePosition>({ x: 0, y: 0 });
-  const [rightEyePos, setRightEyePos] = useState<EyePosition>({ x: 0, y: 0 });
+type Expression = 'idle' | 'excited' | 'pleasure' | 'ecstasy';
+
+export const RobotEyes = ({ intensity }: RobotEyesProps) => {
   const [blinkState, setBlinkState] = useState(false);
-  const [expression, setExpression] = useState<'normal' | 'happy' | 'curious'>('normal');
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const animationFrameRef = useRef<number>();
+  const [expression, setExpression] = useState<Expression>('idle');
+  const [eyeOpenness, setEyeOpenness] = useState(1);
+  const [pupilSize, setPupilSize] = useState(0.5);
+  const [eyeMovement, setEyeMovement] = useState({ x: 0, y: 0 });
+  const [isVibrating, setIsVibrating] = useState(false);
+
+  useEffect(() => {
+    if (intensity < 20) {
+      setExpression('idle');
+      setEyeOpenness(1);
+      setPupilSize(0.5);
+    } else if (intensity < 50) {
+      setExpression('excited');
+      setEyeOpenness(1.1);
+      setPupilSize(0.6);
+    } else if (intensity < 80) {
+      setExpression('pleasure');
+      setEyeOpenness(0.7);
+      setPupilSize(0.8);
+    } else {
+      setExpression('ecstasy');
+      setEyeOpenness(0.3);
+      setPupilSize(1);
+      setIsVibrating(true);
+    }
+
+    if (intensity < 80) {
+      setIsVibrating(false);
+    }
+  }, [intensity]);
 
   useEffect(() => {
     const blinkInterval = setInterval(() => {
-      setBlinkState(true);
-      setTimeout(() => setBlinkState(false), 150);
-    }, 3000 + Math.random() * 2000);
+      if (expression !== 'ecstasy') {
+        setBlinkState(true);
+        setTimeout(() => setBlinkState(false), 150);
+      }
+    }, 2000 + Math.random() * 3000);
 
     return () => clearInterval(blinkInterval);
-  }, []);
+  }, [expression]);
 
   useEffect(() => {
-    let stream: MediaStream | null = null;
-
-    const startCamera = async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480 }
+    const moveInterval = setInterval(() => {
+      if (expression === 'idle') {
+        setEyeMovement({
+          x: (Math.random() - 0.5) * 20,
+          y: (Math.random() - 0.5) * 15,
         });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (err) {
-        console.error('Camera access denied:', err);
+      } else if (expression === 'excited') {
+        setEyeMovement({
+          x: Math.sin(Date.now() * 0.003) * 15,
+          y: Math.cos(Date.now() * 0.002) * 10,
+        });
+      } else if (expression === 'pleasure') {
+        setEyeMovement({
+          x: Math.sin(Date.now() * 0.005) * 25,
+          y: -10 + Math.sin(Date.now() * 0.004) * 8,
+        });
+      } else if (expression === 'ecstasy') {
+        setEyeMovement({
+          x: Math.sin(Date.now() * 0.01) * 30,
+          y: -20 + Math.sin(Date.now() * 0.008) * 5,
+        });
       }
-    };
+    }, 50);
 
-    if (trackingMode !== 'idle') {
-      startCamera();
-    }
+    return () => clearInterval(moveInterval);
+  }, [expression]);
 
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [trackingMode]);
-
-  useEffect(() => {
-    if (!videoRef.current || trackingMode === 'idle') return;
-
-    const processFrame = () => {
-      if (trackingMode === 'motion') {
-        const moveX = (Math.sin(Date.now() * 0.001) * 15);
-        const moveY = (Math.cos(Date.now() * 0.0015) * 10);
-        setLeftEyePos({ x: moveX, y: moveY });
-        setRightEyePos({ x: moveX, y: moveY });
-      } else if (trackingMode === 'face') {
-        const faceX = (Math.sin(Date.now() * 0.002) * 20);
-        const faceY = (Math.cos(Date.now() * 0.002) * 15);
-        setLeftEyePos({ x: faceX, y: faceY });
-        setRightEyePos({ x: faceX, y: faceY });
-        setExpression('curious');
-      } else if (trackingMode === 'expression') {
-        const exprX = (Math.sin(Date.now() * 0.003) * 10);
-        const exprY = (Math.cos(Date.now() * 0.003) * 8);
-        setLeftEyePos({ x: exprX, y: exprY });
-        setRightEyePos({ x: exprX, y: exprY });
-        setExpression(Math.random() > 0.5 ? 'happy' : 'normal');
-      }
-
-      animationFrameRef.current = requestAnimationFrame(processFrame);
-    };
-
-    processFrame();
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [trackingMode]);
+  const getEyeHeight = () => {
+    if (blinkState) return 'h-2';
+    const height = 96 * eyeOpenness;
+    return `h-[${height}px]`;
+  };
 
   const getEyeShape = () => {
-    if (blinkState) return 'h-2';
-    if (expression === 'happy') return 'h-20 rounded-t-full rounded-b-lg';
-    if (expression === 'curious') return 'h-24 w-24';
-    return 'h-24 w-24';
+    if (expression === 'idle') return 'rounded-full';
+    if (expression === 'excited') return 'rounded-full';
+    if (expression === 'pleasure') return 'rounded-[50%] rounded-t-full';
+    if (expression === 'ecstasy') return 'rounded-full';
+    return 'rounded-full';
+  };
+
+  const getPupilSize = () => {
+    return 48 * pupilSize;
   };
 
   return (
-    <div className="relative flex items-center justify-center gap-16">
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="hidden"
-      />
-      
+    <div className="relative flex items-center justify-center gap-16 select-none">
       <div className="relative">
         <div
-          className={`bg-white rounded-full ${getEyeShape()} w-24 shadow-2xl flex items-center justify-center transition-all duration-200 border-4 border-gray-200`}
+          className={`bg-white ${getEyeShape()} w-24 shadow-2xl flex items-center justify-center transition-all duration-300 border-4 border-primary/20 ${
+            isVibrating ? 'animate-shake' : ''
+          }`}
           style={{
-            transform: `translate(${leftEyePos.x}px, ${leftEyePos.y}px)`,
+            height: blinkState ? '8px' : `${96 * eyeOpenness}px`,
+            transform: `translate(${eyeMovement.x}px, ${eyeMovement.y}px)`,
           }}
         >
           {!blinkState && (
             <div
-              className="bg-gray-900 rounded-full w-12 h-12 transition-all duration-150"
+              className="bg-gray-900 rounded-full transition-all duration-300 relative"
               style={{
-                transform: `translate(${leftEyePos.x * 0.3}px, ${leftEyePos.y * 0.3}px)`,
+                width: `${getPupilSize()}px`,
+                height: `${getPupilSize()}px`,
               }}
             >
-              <div className="bg-white rounded-full w-4 h-4 ml-7 mt-2" />
+              <div 
+                className="bg-white rounded-full absolute"
+                style={{
+                  width: `${getPupilSize() * 0.3}px`,
+                  height: `${getPupilSize() * 0.3}px`,
+                  left: '60%',
+                  top: '20%',
+                }}
+              />
             </div>
           )}
         </div>
@@ -130,19 +132,31 @@ export const RobotEyes = ({ trackingMode }: RobotEyesProps) => {
 
       <div className="relative">
         <div
-          className={`bg-white rounded-full ${getEyeShape()} w-24 shadow-2xl flex items-center justify-center transition-all duration-200 border-4 border-gray-200`}
+          className={`bg-white ${getEyeShape()} w-24 shadow-2xl flex items-center justify-center transition-all duration-300 border-4 border-primary/20 ${
+            isVibrating ? 'animate-shake' : ''
+          }`}
           style={{
-            transform: `translate(${rightEyePos.x}px, ${rightEyePos.y}px)`,
+            height: blinkState ? '8px' : `${96 * eyeOpenness}px`,
+            transform: `translate(${eyeMovement.x}px, ${eyeMovement.y}px)`,
           }}
         >
           {!blinkState && (
             <div
-              className="bg-gray-900 rounded-full w-12 h-12 transition-all duration-150"
+              className="bg-gray-900 rounded-full transition-all duration-300 relative"
               style={{
-                transform: `translate(${rightEyePos.x * 0.3}px, ${rightEyePos.y * 0.3}px)`,
+                width: `${getPupilSize()}px`,
+                height: `${getPupilSize()}px`,
               }}
             >
-              <div className="bg-white rounded-full w-4 h-4 ml-7 mt-2" />
+              <div 
+                className="bg-white rounded-full absolute"
+                style={{
+                  width: `${getPupilSize() * 0.3}px`,
+                  height: `${getPupilSize() * 0.3}px`,
+                  left: '60%',
+                  top: '20%',
+                }}
+              />
             </div>
           )}
         </div>
