@@ -93,13 +93,18 @@ export default {
 					'0%, 100%': { transform: 'translateX(0)' },
 					'10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-2px)' },
 					'20%, 40%, 60%, 80%': { transform: 'translateX(2px)' }
+				},
+				'float-up': {
+					'0%': { transform: 'translateY(0) scale(1)', opacity: '1' },
+					'100%': { transform: 'translateY(-100vh) scale(1.5)', opacity: '0' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'fade-in': 'fade-in 0.3s ease-out',
-				'shake': 'shake 0.5s ease-in-out infinite'
+				'shake': 'shake 0.5s ease-in-out infinite',
+				'float-up': 'float-up 3s ease-out forwards'
 			}
 		}
 	},
